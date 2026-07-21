@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>苹果果园：数位大冒险</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入烟花特效库 -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Zcool+KuaiLe&display=swap');
+
+        body {
+            font-family: 'Zcool KuaiLe', cursive, sans-serif;
+            background-color: #E0F7FA;
+            background-image: radial-gradient(#B2EBF2 1px, transparent 1px);
+            background-size: 20px 20px;
+            overflow-x: hidden;
+        }
+
+        /* 掉落动画 */
+        @keyframes dropIn {
+            0% { transform: translateY(-50px); opacity: 0; }
+            60% { transform: translateY(10px); opacity: 1; }
+            100% { transform: translateY(0); }
+        }
+
+        /* 弹跳动画 */
+        @keyframes bounce {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+        }
+        
+        /* 强调闪烁 */
+        @keyframes pulse-highlight {
+            0% { box-shadow: 0 0 0 0 rgba(255, 165, 0, 0.7); transform: scale(1); }
+            70% { box-shadow: 0 0 0 10px rgba(255, 165, 0, 0); transform: scale(1.1); }
+            100% { box-shadow: 0 0 0 0 rgba(255, 165, 0, 0); transform: scale(1); }
+        }
+
+        /* 奖杯弹出动画 */
+        @keyframes pop-in {
+            0% { transform: scale(0) rotate(-180deg); opacity: 0; }
+            80% { transform: scale(1.2) rotate(10deg); opacity: 1; }
+            100% { transform: scale(1) rotate(0deg); }
+        }
+
+        /* 失败震动动画 */
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+            20%, 40%, 60%, 80% { transform: translateX(5px); }
+        }
+
+        .item-drop { animation: dropIn 0.5s ease-out forwards; }
+        .item-bounce { animation: bounce 0.3s ease-in-out; }
+        .rank-badge { animation: pop-in 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+        .shake-fail { animation: shake 0.5s; }
+        
+        .digit-highlight {
+            animation: pulse-highlight 1.5s infinite;
+            border-color: #F59E0B !important;
+            background-color: #FFFBEB !important;
+            z-index: 50;
+        }
+
+        /* 玻璃拟态卡片 */
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(10px);
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
+        }
+
+        .number-input:focus {
+            outline: none;
+            box-shadow: 0 0 0 4px rgba(66, 153, 225, 0.5);
+        }
+
+        /* 隐藏数字输入框的箭头 */
+        input::-webkit-outer-spin-button,
+        input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+
+        /* 竞赛模式网格 */
+        .competition-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: 1fr 1fr;
+            gap: 1rem;
+            height: calc(100vh - 100px);
+            width: 100%;
+            max-width: 1400px;
+        }
+
+        @media (max-width: 768px) {
+            .competition-grid {
+                grid-template-columns: 1fr;
+                height: auto;
+            }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center p-4">
+
+    <!-- 顶部导航/标题区域 -->
+    <header class="w-full max-w-6xl flex flex-col md:flex-row justify-between items-center mb-4 bg-white/80 rounded-xl p-3 shadow-sm gap-4">
+        <div class="text-center md:text-left">
+            <h1 class="text-3xl text-green-700 drop-shadow-md">🍎 苹果果园数学</h1>
+        </div>
+        
+        <div class="flex gap-4">
+            <button onclick="switchMode('learn')" id="btn-mode-learn" class="px-6 py-2 rounded-full font-bold text-lg transition bg-green-500 text-white shadow-md transform scale-105 border-2 border-green-600">
+                📚 学习模式
+            </button>
+            <button onclick="switchMode('competition')" id="btn-mode-competition" class="px-6 py-2 rounded-full font-bold text-lg transition bg-gray-200 text-gray-600 hover:bg-orange-200">
+                🏎️ 四人竞赛
+            </button>
+        </div>
+        
+        <div class="flex gap-2">
+             <button onclick="playApplause()" class="text-sm bg-gray-100 text-gray-600 px-3 py-1 rounded-full hover:bg-gray-200 flex items-center gap-1 border border-gray-300">
+                👏 测声音
+            </button>
+            <button onclick="downloadApp()" class="text-sm bg-purple-100 text-purple-600 px-3 py-1 rounded-full hover:bg-purple-200 flex items-center gap-1 border border-purple-300">
+                💾 下载
+            </button>
+        </div>
+    </header>
+
+    <!-- ================= 学习模式 ================= -->
+    <div id="mode-learn" class="w-full flex flex-col items-center transition-opacity duration-300">
+        <!-- 控制台 -->
+        <div class="glass-panel rounded-2xl p-6 w-full max-w-4xl mb-8">
+            <div class="flex flex-col md:flex-row gap-4 items-center justify-between mb-4">
+                <div class="flex items-center gap-4">
+                    <label class="text-2xl text-gray-700">输入数字:</label>
+                    <input type="number" id="numberInput" min="0" max="999" value="219" 
+                           class="number-input text-3xl text-center w-32 h-16 rounded-xl border-4 border-blue-300 text-blue-800 font-bold bg-white">
+                </div>
+                
+                <div class="flex gap-2 flex-wrap justify-center">
+                    <button onclick="visualize()" class="bg-green-500 hover:bg-green-600 text-white text-lg px-4 py-2 rounded-xl shadow-lg transform transition active:scale-95 border-b-4 border-green-700">
+                        展示果园 🌱
+                    </button>
+                    <button onclick="randomize()" class="bg-yellow-400 hover:bg-yellow-500 text-yellow-900 text-lg px-4 py-2 rounded-xl shadow-lg transform transition active:scale-95 border-b-4 border-yellow-600">
+                        随机数字 🎲
+                    </button>
+                </div>
+            </div>
+
+            <!-- 互动数字展示条 -->
+            <div class="flex justify-center gap-4 mt-1 p-4 bg-blue-50 rounded-xl border-2 border-blue-100">
+                <div class="text-gray-500 text-lg flex items-center mr-2">点数字看解释 👉</div>
+                <div id="digit-hundreds" onclick="explainDigit('hundreds')" class="w-16 h-20 flex items-center justify-center text-5xl font-bold text-red-600 bg-white border-4 border-red-200 rounded-lg cursor-pointer hover:bg-red-50 transition shadow-sm">2</div>
+                <div id="digit-tens" onclick="explainDigit('tens')" class="w-16 h-20 flex items-center justify-center text-5xl font-bold text-blue-600 bg-white border-4 border-blue-200 rounded-lg cursor-pointer hover:bg-blue-50 transition shadow-sm">1</div>
+                <div id="digit-ones" onclick="explainDigit('ones')" class="w-16 h-20 flex items-center justify-center text-5xl font-bold text-green-600 bg-white border-4 border-green-200 rounded-lg cursor-pointer hover:bg-green-50 transition shadow-sm">9</div>
+            </div>
+        </div>
+
+        <!-- 互动展示区 (可视化) -->
+        <div class="w-full max-w-5xl grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-8 mb-8">
+            <!-- 百位 -->
+            <div class="flex flex-col h-full">
+                <div class="bg-red-100 border-4 border-red-300 rounded-t-2xl p-4 text-center relative overflow-hidden">
+                    <h2 class="text-3xl text-red-800 font-bold">百位 (Hundreds)</h2>
+                    <p class="text-red-600 text-sm">1 箱 = 100 个苹果</p>
+                    <div class="absolute top-2 right-2 bg-white rounded-full w-8 h-8 flex items-center justify-center text-red-500 font-bold shadow-sm">
+                        <span id="count-hundreds">2</span>
+                    </div>
+                </div>
+                <div id="col-hundreds" class="bg-white/60 border-x-4 border-b-4 border-red-200 rounded-b-2xl p-4 min-h-[200px] flex flex-wrap content-start gap-2 justify-center transition-all"></div>
+            </div>
+
+            <!-- 十位 -->
+            <div class="flex flex-col h-full">
+                <div class="bg-blue-100 border-4 border-blue-300 rounded-t-2xl p-4 text-center relative overflow-hidden">
+                    <h2 class="text-3xl text-blue-800 font-bold">十位 (Tens)</h2>
+                    <p class="text-blue-600 text-sm">1 篮 = 10 个苹果</p>
+                    <div class="absolute top-2 right-2 bg-white rounded-full w-8 h-8 flex items-center justify-center text-blue-500 font-bold shadow-sm">
+                        <span id="count-tens">1</span>
+                    </div>
+                </div>
+                <div id="col-tens" class="bg-white/60 border-x-4 border-b-4 border-blue-200 rounded-b-2xl p-4 min-h-[200px] flex flex-wrap content-start gap-2 justify-center transition-all"></div>
+            </div>
+
+            <!-- 个位 -->
+            <div class="flex flex-col h-full">
+                <div class="bg-green-100 border-4 border-green-300 rounded-t-2xl p-4 text-center relative overflow-hidden">
+                    <h2 class="text-3xl text-green-800 font-bold">个位 (Ones)</h2>
+                    <p class="text-green-600 text-sm">1 个苹果</p>
+                    <div class="absolute top-2 right-2 bg-white rounded-full w-8 h-8 flex items-center justify-center text-green-500 font-bold shadow-sm">
+                        <span id="count-ones">9</span>
+                    </div>
+                </div>
+                <div id="col-ones" class="bg-white/60 border-x-4 border-b-4 border-green-200 rounded-b-2xl p-4 min-h-[200px] flex flex-wrap content-start gap-2 justify-center transition-all"></div>
+            </div>
+        </div>
+
+        <!-- 学习模式的挑战区 -->
+        <div class="w-full max-w-4xl mt-4 mb-12">
+            <div class="glass-panel rounded-3xl p-1 bg-gradient-to-r from-yellow-300 to-orange-300">
+                <div class="bg-white rounded-[20px] p-6 text-center">
+                    <h3 class="text-3xl text-orange-600 font-bold mb-4">🏆 单人挑战 🏆</h3>
+                    
+                    <div id="quiz-start-area">
+                        <p class="text-gray-600 text-xl mb-4">准备好了吗？来考考你能不能分清它们！</p>
+                        <button onclick="startQuiz()" class="bg-orange-500 hover:bg-orange-600 text-white text-2xl px-12 py-4 rounded-full shadow-lg transform transition active:scale-95 animate-bounce">
+                            出题考考我！
+                        </button>
+                    </div>
+
+                    <div id="quiz-question-area" class="hidden">
+                        <p id="quiz-question-text" class="text-2xl md:text-3xl text-gray-800 font-bold mb-8">
+                            问题加载中...
+                        </p>
+                        <div id="quiz-options" class="flex flex-wrap justify-center gap-4"></div>
+                        <div id="quiz-feedback" class="mt-6 text-2xl font-bold min-h-[40px]"></div>
+                        <button onclick="startQuiz()" id="next-q-btn" class="hidden mt-4 bg-gray-200 text-gray-600 px-6 py-2 rounded-lg hover:bg-gray-300">下一题</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= 竞赛模式 ================= -->
+    <div id="mode-competition" class="hidden w-full flex flex-col items-center">
+        
+        <div class="mb-4 flex gap-4">
+            <button onclick="initCompetition()" class="bg-orange-500 hover:bg-orange-600 text-white text-2xl px-8 py-3 rounded-full shadow-xl transform transition hover:scale-105 border-b-4 border-orange-700 font-bold">
+                🏁 开始新一轮竞赛
+            </button>
+        </div>
+
+        <div class="competition-grid">
+            <!-- 玩家 1 -->
+            <div id="p1-card" class="glass-panel rounded-2xl p-4 border-t-8 border-red-400 flex flex-col relative overflow-hidden bg-red-50">
+                <div class="flex justify-between items-center mb-2">
+                    <span class="text-2xl font-bold text-red-800">学生 1</span>
+                    <span id="p1-status" class="text-xl">🔴</span>
+                </div>
+                <div id="p1-content" class="flex-grow flex flex-col justify-center items-center text-center">
+                    <p class="text-gray-400">等待开始...</p>
+                </div>
+                <div id="p1-rank" class="hidden absolute top-0 left-0 w-full h-full bg-white/90 flex flex-col items-center justify-center z-10 rank-badge">
+                    <!-- 这里会动态填入排名或失败 -->
+                </div>
+            </div>
+
+            <!-- 玩家 2 -->
+            <div id="p2-card" class="glass-panel rounded-2xl p-4 border-t-8 border-blue-400 flex flex-col relative overflow-hidden bg-blue-50">
+                <div class="flex justify-between items-center mb-2">
+                    <span class="text-2xl font-bold text-blue-800">学生 2</span>
+                    <span id="p2-status" class="text-xl">🔵</span>
+                </div>
+                <div id="p2-content" class="flex-grow flex flex-col justify-center items-center text-center">
+                    <p class="text-gray-400">等待开始...</p>
+                </div>
+                <div id="p2-rank" class="hidden absolute top-0 left-0 w-full h-full bg-white/90 flex flex-col items-center justify-center z-10 rank-badge">
+                </div>
+            </div>
+
+            <!-- 玩家 3 -->
+            <div id="p3-card" class="glass-panel rounded-2xl p-4 border-t-8 border-green-400 flex flex-col relative overflow-hidden bg-green-50">
+                <div class="flex justify-between items-center mb-2">
+                    <span class="text-2xl font-bold text-green-800">学生 3</span>
+                    <span id="p3-status" class="text-xl">🟢</span>
+                </div>
+                <div id="p3-content" class="flex-grow flex flex-col justify-center items-center text-center">
+                    <p class="text-gray-400">等待开始...</p>
+                </div>
+                <div id="p3-rank" class="hidden absolute top-0 left-0 w-full h-full bg-white/90 flex flex-col items-center justify-center z-10 rank-badge">
+                </div>
+            </div>
+
+            <!-- 玩家 4 -->
+            <div id="p4-card" class="glass-panel rounded-2xl p-4 border-t-8 border-purple-400 flex flex-col relative overflow-hidden bg-purple-50">
+                <div class="flex justify-between items-center mb-2">
+                    <span class="text-2xl font-bold text-purple-800">学生 4</span>
+                    <span id="p4-status" class="text-xl">🟣</span>
+                </div>
+                <div id="p4-content" class="flex-grow flex flex-col justify-center items-center text-center">
+                    <p class="text-gray-400">等待开始...</p>
+                </div>
+                <div id="p4-rank" class="hidden absolute top-0 left-0 w-full h-full bg-white/90 flex flex-col items-center justify-center z-10 rank-badge">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 最终颁奖弹窗 -->
+    <div id="winner-modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm">
+        <div class="bg-white rounded-3xl p-8 max-w-2xl w-full text-center shadow-2xl border-8 border-yellow-400 transform scale-100">
+            <h2 class="text-5xl text-yellow-500 font-bold mb-6">🎉 比赛结束！ 🎉</h2>
+            <div id="winner-list" class="flex flex-col gap-4 text-2xl mb-8">
+                <!-- 排名列表 -->
+            </div>
+            <button onclick="closeWinnerModal()" class="bg-green-500 hover:bg-green-600 text-white text-2xl px-10 py-4 rounded-full shadow-lg font-bold">
+                再来一局！
+            </button>
+        </div>
+    </div>
+
+    <!-- 底部提示框 -->
+    <div id="info-box" class="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-6 py-4 rounded-2xl shadow-2xl text-lg md:text-xl transition-all opacity-0 translate-y-10 scale-90 pointer-events-none z-50 text-center w-[90%] md:w-auto border-2 border-gray-600">
+        提示信息
+    </div>
+
+    <script>
+        // --- 通用逻辑 ---
+        const assets = {
+            hundred: { icon: '📦', label: '箱子', value: 100 },
+            ten:     { icon: '🧺', label: '篮子', value: 10 },
+            one:     { icon: '🍎', label: '苹果', value: 1 }
+        };
+
+        let currentMode = 'learn'; // learn, competition
+
+        // --- 学习模式变量 ---
+        let currentNumber = 219;
+        let currentDigits = { h: 2, t: 1, o: 9 };
+
+        // --- 竞赛模式变量 ---
+        let compRankCounter = 1;
+        let compPlayersFinished = 0;
+        const totalPlayers = 4;
+        let playerResults = []; // {id: 1, rank: 1, time: ...}
+
+        window.onload = function() {
+            visualize(); // 初始化学习模式
+            initAudio(); // 初始化音频
+        };
+
+        // 模式切换
+        function switchMode(mode) {
+            currentMode = mode;
+            const learnBtn = document.getElementById('btn-mode-learn');
+            const compBtn = document.getElementById('btn-mode-competition');
+            const learnArea = document.getElementById('mode-learn');
+            const compArea = document.getElementById('mode-competition');
+
+            if (mode === 'learn') {
+                learnBtn.className = "px-6 py-2 rounded-full font-bold text-lg transition bg-green-500 text-white shadow-md transform scale-105 border-2 border-green-600";
+                compBtn.className = "px-6 py-2 rounded-full font-bold text-lg transition bg-gray-200 text-gray-600 hover:bg-orange-200";
+                learnArea.classList.remove('hidden');
+                compArea.classList.add('hidden');
+            } else {
+                compBtn.className = "px-6 py-2 rounded-full font-bold text-lg transition bg-orange-500 text-white shadow-md transform scale-105 border-2 border-orange-600";
+                learnBtn.className = "px-6 py-2 rounded-full font-bold text-lg transition bg-gray-200 text-gray-600 hover:bg-green-200";
+                learnArea.classList.add('hidden');
+                compArea.classList.remove('hidden');
+            }
+        }
+
+        // ================= 音效逻辑 =================
+        let audioCtx = null;
+        let noiseBuffer = null;
+
+        function initAudio() {
+            if (!audioCtx) {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                if (AudioContext) {
+                    audioCtx = new AudioContext();
+                }
+            }
+        }
+
+        function createNoiseBuffer() {
+            if (!audioCtx) return;
+            const bufferSize = audioCtx.sampleRate * 2;
+            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = Math.random() * 2 - 1;
+            }
+            return buffer;
+        }
+
+        function playClap(startTime) {
+            if (!audioCtx) return;
+            if (!noiseBuffer) noiseBuffer = createNoiseBuffer();
+            const source = audioCtx.createBufferSource();
+            source.buffer = noiseBuffer;
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = "bandpass";
+            filter.frequency.value = 1000; filter.Q.value = 1.5;
+            const gain = audioCtx.createGain();
+            gain.gain.setValueAtTime(0, startTime);
+            gain.gain.linearRampToValueAtTime(0.6, startTime + 0.005);
+            gain.gain.exponentialRampToValueAtTime(0.01, startTime + 0.1);
+            source.connect(filter); filter.connect(gain); gain.connect(audioCtx.destination);
+            source.start(startTime); source.stop(startTime + 0.15);
+        }
+
+        function playApplause() {
+            if (!audioCtx) initAudio();
+            if (!audioCtx || audioCtx.state === 'suspended') { audioCtx?.resume(); }
+            if (!audioCtx) return;
+            const now = audioCtx.currentTime;
+            for (let i = 0; i < 20; i++) {
+                const offset = Math.random() * 1.5;
+                const time = now + (i < 5 ? offset * 0.2 : offset);
+                playClap(time);
+            }
+        }
+        
+        function playFailSound() {
+            if (!audioCtx) initAudio();
+            if (!audioCtx || audioCtx.state === 'suspended') { audioCtx?.resume(); }
+            if (!audioCtx) return;
+            const now = audioCtx.currentTime;
+            playTone(300, now, 0.2, 'sawtooth'); 
+            playTone(200, now + 0.2, 0.4, 'sawtooth'); 
+        }
+
+        function playTone(freq, startTime, duration, type = 'sine') {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = type; osc.frequency.value = freq;
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            gain.gain.setValueAtTime(0, startTime);
+            gain.gain.linearRampToValueAtTime(0.3, startTime + 0.02);
+            gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+            osc.start(startTime); osc.stop(startTime + duration + 0.1);
+        }
+
+        // ================= 学习模式逻辑 =================
+        function randomize() {
+            const randomNum = Math.floor(Math.random() * 999) + 1;
+            document.getElementById('numberInput').value = randomNum;
+            visualize();
+            resetQuizUI();
+        }
+
+        function visualize() {
+            const input = document.getElementById('numberInput');
+            let val = parseInt(input.value);
+            if (isNaN(val) || val < 0) val = 0;
+            if (val > 999) { val = 999; input.value = 999; }
+            currentNumber = val;
+            const h = Math.floor(val / 100);
+            const t = Math.floor((val % 100) / 10);
+            const o = val % 10;
+            currentDigits = { h, t, o };
+            document.getElementById('count-hundreds').innerText = h;
+            document.getElementById('count-tens').innerText = t;
+            document.getElementById('count-ones').innerText = o;
+            document.getElementById('digit-hundreds').innerText = h;
+            document.getElementById('digit-tens').innerText = t;
+            document.getElementById('digit-ones').innerText = o;
+            renderColumn('col-hundreds', h, assets.hundred, 'hundreds');
+            renderColumn('col-tens', t, assets.ten, 'tens');
+            renderColumn('col-ones', o, assets.one, 'ones');
+            resetQuizUI();
+        }
+
+        function renderColumn(containerId, count, assetType, placeType) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = ''; 
+            for (let i = 0; i < count; i++) {
+                const item = document.createElement('div');
+                item.className = `text-5xl cursor-pointer select-none transform transition hover:scale-110 item-drop flex items-center justify-center w-16 h-16 bg-white/40 rounded-lg shadow-sm border border-white/50`;
+                item.innerText = assetType.icon;
+                item.style.animationDelay = `${i * 0.05}s`;
+                item.onclick = () => {
+                    item.classList.remove('item-bounce'); void item.offsetWidth; item.classList.add('item-bounce');
+                    explainVisualItem(assetType, placeType);
+                };
+                container.appendChild(item);
+            }
+        }
+
+        function explainDigit(place) {
+            let digit, placeName, value;
+            if (place === 'hundreds') { digit = currentDigits.h; placeName = '百位'; value = digit * 100; } 
+            else if (place === 'tens') { digit = currentDigits.t; placeName = '十位'; value = digit * 10; } 
+            else { digit = currentDigits.o; placeName = '个位'; value = digit; }
+            showToast(`我是数字 <b class="text-yellow-300 text-2xl">${digit}</b><br>我在 <b class="text-blue-300">${placeName}</b>，我的数值是 <b class="text-green-300 text-2xl">${value}</b>`);
+            highlightDigit(place);
+        }
+
+        function explainVisualItem(assetType, placeType) {
+            let placeName = placeType === 'hundreds' ? "百位" : (placeType === 'tens' ? "十位" : "个位");
+            showToast(`这里是 <span class="font-bold text-yellow-300">${placeName}</span><br>这个 ${assetType.icon} 代表数值 <span class="font-bold text-3xl text-green-300">${assetType.value}</span>`);
+            highlightDigit(placeType);
+        }
+
+        function showToast(html) {
+            const infoBox = document.getElementById('info-box');
+            infoBox.innerHTML = html;
+            infoBox.classList.remove('opacity-0', 'translate-y-10', 'scale-90');
+            infoBox.classList.add('opacity-100', 'translate-y-0', 'scale-100');
+            clearTimeout(window.infoTimeout);
+            window.infoTimeout = setTimeout(() => {
+                infoBox.classList.add('opacity-0', 'translate-y-10', 'scale-90');
+                infoBox.classList.remove('opacity-100', 'translate-y-0', 'scale-100');
+            }, 3500);
+        }
+
+        function highlightDigit(place) {
+            ['hundreds', 'tens', 'ones'].forEach(p => document.getElementById(`digit-${p}`).classList.remove('digit-highlight'));
+            const el = document.getElementById(`digit-${place}`);
+            el.classList.remove('digit-highlight');
+            void el.offsetWidth; el.classList.add('digit-highlight');
+            setTimeout(() => el.classList.remove('digit-highlight'), 1500);
+        }
+
+        function resetQuizUI() {
+            document.getElementById('quiz-start-area').classList.remove('hidden');
+            document.getElementById('quiz-question-area').classList.add('hidden');
+            ['hundreds', 'tens', 'ones'].forEach(p => document.getElementById(`digit-${p}`).classList.remove('digit-highlight'));
+        }
+
+        function startQuiz() {
+            document.getElementById('quiz-start-area').classList.add('hidden');
+            document.getElementById('quiz-question-area').classList.remove('hidden');
+            document.getElementById('quiz-feedback').innerHTML = '';
+            document.getElementById('next-q-btn').classList.add('hidden');
+            
+            const {questionText, options, correctAnswer} = generateQuestion();
+
+            document.getElementById('quiz-question-text').innerHTML = questionText;
+            const optsContainer = document.getElementById('quiz-options');
+            optsContainer.innerHTML = '';
+            
+            options.forEach(opt => {
+                const btn = document.createElement('button');
+                btn.className = "bg-white border-2 border-gray-300 hover:border-blue-400 text-gray-700 font-bold py-3 px-8 rounded-xl text-xl md:text-2xl shadow-sm transition transform active:scale-95 min-w-[100px]";
+                btn.innerText = opt;
+                btn.onclick = () => checkAnswer(opt, correctAnswer, btn);
+                optsContainer.appendChild(btn);
+            });
+        }
+
+        // 生成题目的通用函数
+        function generateQuestion() {
+            const randomNum = Math.floor(Math.random() * 999) + 1;
+            const h = Math.floor(randomNum / 100);
+            const t = Math.floor((randomNum % 100) / 10);
+            const o = randomNum % 10;
+            
+            const places = ['hundreds', 'tens', 'ones'];
+            const targetPlace = places[Math.floor(Math.random() * 3)];
+            const questionType = Math.random() > 0.5 ? 'PLACE' : 'VALUE';
+
+            let digit = targetPlace === 'hundreds' ? h : (targetPlace === 'tens' ? t : o);
+            let questionText = "";
+            let correctAnswer = "";
+            let options = [];
+
+            if (questionType === 'PLACE') {
+                questionText = `数字 <span class="text-orange-600 font-bold mx-1">${randomNum}</span> 中，<span class="text-red-600 text-4xl font-bold mx-1">${digit}</span> 在什么<span class="text-blue-600">数位</span>？`;
+                if (targetPlace === 'hundreds') correctAnswer = "百位";
+                else if (targetPlace === 'tens') correctAnswer = "十位";
+                else correctAnswer = "个位";
+                options = ["个位", "十位", "百位"];
+            } else {
+                questionText = `数字 <span class="text-orange-600 font-bold mx-1">${randomNum}</span> 中，<span class="text-blue-600">${targetPlace==='hundreds'?'百位':(targetPlace==='tens'?'十位':'个位')}</span>上的 <span class="text-red-600 text-4xl font-bold mx-1">${digit}</span>，它的<span class="text-green-600">数值</span>是多少？`;
+                if (targetPlace === 'hundreds') correctAnswer = digit * 100;
+                else if (targetPlace === 'tens') correctAnswer = digit * 10;
+                else correctAnswer = digit;
+                options = [digit, digit * 10, digit * 100];
+                if (digit === 0) { options = [0, 10, 100]; correctAnswer = 0; }
+                else { options = options.sort(() => Math.random() - 0.5); }
+            }
+            return { questionText, options, correctAnswer, rawNum: randomNum };
+        }
+
+        function checkAnswer(selected, correct, btnElement) {
+            const feedback = document.getElementById('quiz-feedback');
+            const nextBtn = document.getElementById('next-q-btn');
+            const allBtns = document.querySelectorAll('#quiz-options button');
+            allBtns.forEach(b => b.disabled = true);
+
+            if (selected == correct) { 
+                btnElement.classList.remove('border-gray-300');
+                btnElement.classList.add('bg-green-500', 'text-white', 'border-green-600');
+                feedback.innerHTML = `<span class="text-green-600">✅ 答对啦！真棒！</span>`;
+                triggerFireworks();
+                playApplause();
+            } else {
+                btnElement.classList.remove('border-gray-300');
+                btnElement.classList.add('bg-red-500', 'text-white', 'border-red-600');
+                feedback.innerHTML = `<span class="text-red-500">❌ 哎呀，不对哦。正确答案是 ${correct}</span>`;
+                playFailSound();
+            }
+            nextBtn.classList.remove('hidden');
+        }
+
+        // ================= 竞赛模式逻辑 =================
+
+        function initCompetition() {
+            compRankCounter = 1;
+            compPlayersFinished = 0;
+            playerResults = [];
+            
+            for (let i = 1; i <= 4; i++) {
+                resetPlayerCard(i);
+                generatePlayerQuestion(i);
+            }
+            
+            // 隐藏颁奖弹窗
+            document.getElementById('winner-modal').classList.add('hidden');
+        }
+
+        function resetPlayerCard(playerId) {
+            const card = document.getElementById(`p${playerId}-card`);
+            const rankOverlay = document.getElementById(`p${playerId}-rank`);
+            rankOverlay.classList.add('hidden');
+            rankOverlay.innerHTML = ''; // 清空之前的排名或失败标志
+            card.classList.remove('opacity-50');
+        }
+
+        function generatePlayerQuestion(playerId) {
+            const container = document.getElementById(`p${playerId}-content`);
+            const {questionText, options: originalOptions, correctAnswer} = generateQuestion(); // 复用题库
+
+            // --- 二选一逻辑 ---
+            let finalOptions = [correctAnswer];
+            // 从原始选项中找到一个错误的
+            const wrongOptions = originalOptions.filter(o => o != correctAnswer);
+            // 随机选一个错误项
+            const randomWrong = wrongOptions[Math.floor(Math.random() * wrongOptions.length)];
+            finalOptions.push(randomWrong);
+            // 再次打乱，防止正确答案总在第一个
+            finalOptions.sort(() => Math.random() - 0.5);
+
+            // 构建问题HTML
+            let html = `
+                <div class="w-full h-full flex flex-col justify-between">
+                    <div class="text-lg md:text-2xl font-bold text-gray-800 mb-2 leading-tight">${questionText}</div>
+                    <div class="grid grid-cols-1 gap-2 w-full">
+            `;
+            
+            finalOptions.forEach(opt => {
+                html += `<button onclick="handleCompAnswer(${playerId}, '${opt}', '${correctAnswer}', this)" class="w-full bg-white border-2 border-gray-200 hover:bg-gray-50 py-4 rounded-lg text-2xl font-bold shadow-sm transition active:scale-95">${opt}</button>`;
+            });
+            
+            html += `</div></div>`;
+            container.innerHTML = html;
+        }
+
+        function handleCompAnswer(playerId, selected, correct, btn) {
+            // 如果已经有排名或失败标记，不允许再点
+            const rankOverlay = document.getElementById(`p${playerId}-rank`);
+            if (rankOverlay.classList.contains('hidden') === false) return;
+
+            if (selected == correct) {
+                // 答对了！
+                const rank = compRankCounter++;
+                compPlayersFinished++;
+                
+                // 显示排名
+                rankOverlay.innerHTML = `<div class="text-6xl mb-2">🏆</div><div class="text-4xl font-bold text-yellow-500 rank-text">第 ${rank} 名</div>`;
+                const rankText = rankOverlay.querySelector('.rank-text');
+                
+                if(rank === 1) { rankText.className = "text-4xl font-bold text-yellow-500 rank-text"; }
+                else if(rank === 2) { rankText.className = "text-4xl font-bold text-gray-500 rank-text"; }
+                else if(rank === 3) { rankText.className = "text-4xl font-bold text-orange-600 rank-text"; }
+                else { rankText.className = "text-4xl font-bold text-blue-600 rank-text"; }
+
+                rankOverlay.classList.remove('hidden');
+                
+                // 记录结果
+                playerResults.push({id: playerId, rank: rank});
+
+                // 播放声音
+                playApplause();
+
+                // 定点放烟花
+                const card = document.getElementById(`p${playerId}-card`);
+                const rect = card.getBoundingClientRect();
+                const x = (rect.left + rect.width / 2) / window.innerWidth;
+                const y = (rect.top + rect.height / 2) / window.innerHeight;
+                fireworksAt(x, y);
+
+            } else {
+                // 答错了 - 淘汰逻辑
+                compPlayersFinished++;
+                
+                // 显示失败
+                rankOverlay.innerHTML = `<div class="text-6xl mb-2">❌</div><div class="text-4xl font-bold text-gray-500">挑战失败</div>`;
+                rankOverlay.classList.remove('hidden');
+                
+                // 播放失败音效
+                playFailSound();
+
+                // 记录结果 (rank 999 表示失败)
+                playerResults.push({id: playerId, rank: 999});
+                
+                // 卡片震动一下
+                const card = document.getElementById(`p${playerId}-card`);
+                card.classList.add('shake-fail');
+                card.classList.add('opacity-50'); // 变灰
+            }
+
+            // 检查是否所有人都结束 (4人都完成)
+            if (compPlayersFinished === 4) {
+                setTimeout(showWinnerModal, 1500);
+            }
+        }
+
+        function showWinnerModal() {
+            const modal = document.getElementById('winner-modal');
+            const list = document.getElementById('winner-list');
+            list.innerHTML = '';
+
+            // 排序结果 (失败者排最后)
+            playerResults.sort((a, b) => a.rank - b.rank);
+
+            playerResults.forEach(p => {
+                const div = document.createElement('div');
+                div.className = "bg-gray-100 p-3 rounded-xl font-bold text-gray-700 flex items-center justify-center";
+                
+                if (p.rank === 999) {
+                    div.innerHTML = `<span class="mr-2">❌</span> 学生 ${p.id}：挑战失败`;
+                    div.classList.add('opacity-60');
+                } else {
+                    let medal = '';
+                    if(p.rank===1) medal = '🥇';
+                    else if(p.rank===2) medal = '🥈';
+                    else if(p.rank===3) medal = '🥉';
+                    div.innerHTML = `<span class="mr-2">${medal}</span> 第${p.rank}名：学生 ${p.id}`;
+                }
+                
+                list.appendChild(div);
+            });
+
+            modal.classList.remove('hidden');
+            // 只有当至少有一个人成功时才放烟花
+            const hasWinner = playerResults.some(p => p.rank !== 999);
+            if(hasWinner) triggerFireworks();
+        }
+
+        function closeWinnerModal() {
+            document.getElementById('winner-modal').classList.add('hidden');
+            initCompetition(); // 直接开始下一局
+        }
+
+        // 烟花逻辑 (通用)
+        function triggerFireworks() {
+            var count = 200; var defaults = { origin: { y: 0.7 } };
+            function fire(particleRatio, opts) {
+                confetti(Object.assign({}, defaults, opts, { particleCount: Math.floor(count * particleRatio) }));
+            }
+            fire(0.25, { spread: 26, startVelocity: 55 });
+            fire(0.2, { spread: 60 });
+            fire(0.35, { spread: 100, decay: 0.91, scalar: 0.8 });
+            fire(0.1, { spread: 120, startVelocity: 25, decay: 0.92, scalar: 1.2 });
+            fire(0.1, { spread: 120, startVelocity: 45 });
+        }
+
+        // 定点烟花
+        function fireworksAt(x, y) {
+            confetti({
+                particleCount: 100,
+                spread: 70,
+                origin: { x: x, y: y }
+            });
+        }
+
+        document.getElementById('numberInput').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') { visualize(); }
+        });
+
+        function downloadApp() {
+            const htmlContent = document.documentElement.outerHTML;
+            const blob = new Blob([htmlContent], {type: 'text/html'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'apple_math_competition_v2.html';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            alert("🎉 文件已下载！包含二选一和淘汰规则！");
+        }
+    </script>
+</body>
+</html>
