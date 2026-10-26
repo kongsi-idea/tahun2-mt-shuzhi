@@ -12,4 +12,4 @@
 - 本仓库 `.git/refs/` 曾有 iCloud 复制出的 `main 2` 旧 ref，`git fetch` 报 `bad object refs/heads/main 2`；已移走。再出现就把带「 2」的 ref 档挪出 `.git`。
 - Hub 部署时 `git worktree add` 卡住（iCloud）；改从 GitHub clone 到 `~/Library/Caches/` 再 `vercel --prod`（kongsi-idea 项目网域会自动指向，curl 已确认）。
 
-🕐 最后更新：2026-10-26 · Claude Opus 5.5 @ mr007's Macbook Air · Git：待推
+🕐 最后更新：2026-10-26 · Claude Opus 5.5 @ mr007's Macbook Air · Git：✅ 已推
