@@ -1,19 +1,15 @@
-# 苹果果园数学（tahun2-mt-shuzhi）交接
+# 苹果果园数学 交接
 
-## 现况（2026-10-26，v2.0）
-- 线上：https://tahun2-mt-shuzhi.vercel.app（push main 由 GitHub Actions 自动部署）；教师预览 `?preview`。
-- 对应 DSKP：二年级数学 1.4 数位（1.4.1 数位和数值、1.4.2 分析数目），课本第 1 册 p.8–12。
-- 档案：`index.html`＋`style.css`＋`app.js`（出题、果园、引导、竞赛）＋`preview.js`；素材 `assets/`（Canva 风格 A 卡通贴纸），来源与封面脚本在 `tools/`（`.vercelignore` 不部署）。
+⏯️ **做到哪**：2026-10-26 v2.0 全面改版已上线（工具＋点子铺 Hub 2.0、4 张新缩略图、coverage／tools-status 已同步，`npm run check` 全部通过）。设计决定见 `agents.md`。
 
-## 设计决定
-- 不加语音（老师定：避免 Vercel 请求量）；第一次引导用文字气泡＋手指动画，localStorage 键 `shuzhi-g-learn／solo／comp`，右上「？」重看。
-- 容器里的 10 个由代码排成 2×5，不让 AI 画数量。千位栏只在 1000 时出现；不足三位不显示前导 0。
-- 题库：数位题把目标那一位单独标红，避免重复数字歧义；不问不存在的数位；按数位／按数值分析与看图题的数字至少两个非零数位。
-- 四人竞赛：同题 5 题三选一，不淘汰，按答对数、再按完成先后排名。
+🚦 **状态**：可运行。出题自检 `selfCheck(3000)` 全过（上层 package.json 是 ESM，先 `cp app.js /tmp/x.cjs` 再 `node -e "require('/tmp/x.cjs').selfCheck(3000)"`）。
 
-## 自检
-- `app.js` 有 `selfCheck(n)`；上层 package.json 是 ESM，要先 `cp app.js /tmp/x.cjs` 再 `node -e "require('/tmp/x.cjs').selfCheck(3000)"`。
+➡️ **下一步**
+1. 等老师课堂试用反馈，有问题登记到 `../tools-status.json`。
+2. 老师要换封面时：Canva 再生两张候选 → `tools/make_cover.py` 排字 → 同步 og.jpg 与 Hub 第 1 张缩略图。
 
-## 待课堂反馈
-- 1366×768 投影第一屏可看到输入列、数字卡、分析与全部数位栏；单人挑战在下方需滚动。
-- 手指图标是代码画的 SVG，风格与 Canva 素材略不同。
+⚠️ **坑**
+- 本仓库 `.git/refs/` 曾有 iCloud 复制出的 `main 2` 旧 ref，`git fetch` 报 `bad object refs/heads/main 2`；已移走。再出现就把带「 2」的 ref 档挪出 `.git`。
+- Hub 部署时 `git worktree add` 卡住（iCloud）；改从 GitHub clone 到 `~/Library/Caches/` 再 `vercel --prod`（kongsi-idea 项目网域会自动指向，curl 已确认）。
+
+🕐 最后更新：2026-10-26 · Claude Opus 5.5 @ mr007's Macbook Air · Git：待推
